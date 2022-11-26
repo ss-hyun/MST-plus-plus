@@ -1,2 +1,4 @@
-test_dataset/
 .idea/
+*.pyc
+train_code/mst*/
+train_code/data

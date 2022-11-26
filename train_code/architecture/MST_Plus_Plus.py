@@ -268,7 +268,7 @@ class MST(nn.Module):
         return out
 
 class MST_Plus_Plus(nn.Module):
-    def __init__(self, in_channels=3, out_channels=31, n_feat=31, stage=3):
+    def __init__(self, in_channels=20, out_channels=100, n_feat=31, stage=3):
         super(MST_Plus_Plus, self).__init__()
         self.stage = stage
         self.conv_in = nn.Conv2d(in_channels, n_feat, kernel_size=3, padding=(3 - 1) // 2,bias=False)

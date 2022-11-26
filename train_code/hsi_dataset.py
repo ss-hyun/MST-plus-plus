@@ -10,7 +10,7 @@ class TrainDataset(Dataset):
         self.hypers = []
         self.bgrs = []
         self.arg = arg
-        h,w = 482,512  # img shape
+        h,w = 50, 50  # img shape
         self.stride = stride
         self.patch_per_line = (w-crop_size)//stride+1
         self.patch_per_colum = (h-crop_size)//stride+1
