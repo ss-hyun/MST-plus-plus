@@ -31,9 +31,9 @@ os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu_id
 
 # load dataset
 print("\nloading dataset ...")
-train_data = DatasetFromHdf5('./data/train_val-7-8-11_input+chann+20.h5')
+train_data = DatasetFromHdf5('./data/train_val-7-8-14_input+chann+20.h5')
 print(f"Iteration per epoch: {len(train_data)}")
-val_data = DatasetFromHdf5('./data/valid_val-7-8-11_input+chann+20.h5')
+val_data = DatasetFromHdf5('./data/valid_val-7-8-14_input+chann+20.h5')
 print("Validation set samples: ", len(val_data))
 
 # iterations
@@ -110,24 +110,24 @@ def main():
             scheduler.step()
             losses.update(loss.data)
             iteration = iteration + 1
+            # if iteration % (per_epoch_iteration/10) == 0:
+            #     print('[iter:%d/%d],lr=%.9f,train_losses.avg=%.9f'
+            #           % (iteration, total_iteration, lr, losses.avg))
             if iteration % per_epoch_iteration == 0:
-                print('[iter:%d/%d],lr=%.9f,train_losses.avg=%.9f'
-                      % (iteration, total_iteration, lr, losses.avg))
-            if iteration % per_epoch_iteration*5 == 0:
                 mrae_loss, rmse_loss, psnr_loss = validate(val_loader, model)
                 print(f'MRAE:{mrae_loss}, RMSE: {rmse_loss}, PNSR:{psnr_loss}')
                 # Save model
                 if torch.abs(
-                        mrae_loss - record_mrae_loss) < 0.01 or mrae_loss < record_mrae_loss or iteration % per_epoch_iteration*10 == 0:
+                        mrae_loss - record_mrae_loss) < 0.01 or mrae_loss < record_mrae_loss or iteration % (per_epoch_iteration*10) == 0:
                     print(f'Saving to {out_dir}')
                     save_checkpoint(out_dir, (iteration // per_epoch_iteration), iteration, model, optimizer)
                     if mrae_loss < record_mrae_loss:
                         record_mrae_loss = mrae_loss
                 # print loss
-                print(" Iter[%06d], Epoch[%06d], learning rate : %.9f, Train MRAE: %.9f, Test MRAE: %.9f, "
+                print(" Iter[%06d/%06d], Epoch[%04d], learning rate : %.9f, Train MRAE: %.9f, Test MRAE: %.9f, "
                       "Test RMSE: %.9f, Test PSNR: %.9f " % (
-                          iteration, iteration // per_epoch_iteration, lr, losses.avg, mrae_loss, rmse_loss, psnr_loss))
-                logger.info(" Iter[%06d], Epoch[%06d], learning rate : %.9f, Train Loss: %.9f, Test MRAE: %.9f, "
+                          iteration, total_iteration, iteration // per_epoch_iteration, lr, losses.avg, mrae_loss, rmse_loss, psnr_loss))
+                logger.info(" Iter[%06d], Epoch[%04d], learning rate : %.9f, Train Loss: %.9f, Test MRAE: %.9f, "
                             "Test RMSE: %.9f, Test PSNR: %.9f " % (
                                 iteration, iteration // per_epoch_iteration, lr, losses.avg, mrae_loss, rmse_loss, psnr_loss))
     return 0

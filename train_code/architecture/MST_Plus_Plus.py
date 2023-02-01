@@ -6,6 +6,7 @@ import math
 import warnings
 from torch.nn.init import _calculate_fan_in_and_fan_out
 
+
 def _no_grad_trunc_normal_(tensor, mean, std, a, b):
     def norm_cdf(x):
         return (1. + math.erf(x / math.sqrt(2.))) / 2.
@@ -69,21 +70,23 @@ class GELU(nn.Module):
     def forward(self, x):
         return F.gelu(x)
 
-def conv(in_channels, out_channels, kernel_size, bias=False, padding = 1, stride = 1):
+
+def conv(in_channels, out_channels, kernel_size, bias=False, padding=1, stride=1):
     return nn.Conv2d(
         in_channels, out_channels, kernel_size,
-        padding=(kernel_size//2), bias=bias, stride=stride)
+        padding=(kernel_size // 2), bias=bias, stride=stride)
 
 
-def shift_back(inputs,step=2):          # input [bs,28,256,310]  output [bs, 28, 256, 256]
+def shift_back(inputs, step=2):  # input [bs,28,256,310]  output [bs, 28, 256, 256]
     [bs, nC, row, col] = inputs.shape
-    down_sample = 256//row
-    step = float(step)/float(down_sample*down_sample)
+    down_sample = 256 // row
+    step = float(step) / float(down_sample * down_sample)
     out_col = row
     for i in range(nC):
-        inputs[:,i,:,:out_col] = \
-            inputs[:,i,:,int(step*i):int(step*i)+out_col]
+        inputs[:, i, :, :out_col] = \
+            inputs[:, i, :, int(step * i):int(step * i) + out_col]
     return inputs[:, :, :, :out_col]
+
 
 class MS_MSA(nn.Module):
     def __init__(
@@ -113,12 +116,12 @@ class MS_MSA(nn.Module):
         return out: [b,h,w,c]
         """
         b, h, w, c = x_in.shape
-        x = x_in.reshape(b,h*w,c)
+        x = x_in.reshape(b, h * w, c)
         q_inp = self.to_q(x)
         k_inp = self.to_k(x)
         v_inp = self.to_v(x)
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=self.num_heads),
-                                (q_inp, k_inp, v_inp))
+                      (q_inp, k_inp, v_inp))
         v = v
         # q: b,heads,hw,c
         q = q.transpose(-2, -1)
@@ -126,17 +129,18 @@ class MS_MSA(nn.Module):
         v = v.transpose(-2, -1)
         q = F.normalize(q, dim=-1, p=2)
         k = F.normalize(k, dim=-1, p=2)
-        attn = (k @ q.transpose(-2, -1))   # A = K^T*Q
+        attn = (k @ q.transpose(-2, -1))  # A = K^T*Q
         attn = attn * self.rescale
         attn = attn.softmax(dim=-1)
-        x = attn @ v   # b,heads,d,hw
-        x = x.permute(0, 3, 1, 2)    # Transpose
+        x = attn @ v  # b,heads,d,hw
+        x = x.permute(0, 3, 1, 2)  # Transpose
         x = x.reshape(b, h * w, self.num_heads * self.dim_head)
         out_c = self.proj(x).view(b, h, w, c)
-        out_p = self.pos_emb(v_inp.reshape(b,h,w,c).permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
+        out_p = self.pos_emb(v_inp.reshape(b, h, w, c).permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
         out = out_c + out_p
 
         return out
+
 
 class FeedForward(nn.Module):
     def __init__(self, dim, mult=4):
@@ -156,6 +160,7 @@ class FeedForward(nn.Module):
         """
         out = self.net(x.permute(0, 3, 1, 2))
         return out.permute(0, 2, 3, 1)
+
 
 class MSAB(nn.Module):
     def __init__(
@@ -185,8 +190,9 @@ class MSAB(nn.Module):
         out = x.permute(0, 3, 1, 2)
         return out
 
+
 class MST(nn.Module):
-    def __init__(self, in_dim=31, out_dim=31, dim=31, stage=2, num_blocks=[2,4,4]):
+    def __init__(self, in_dim=31, out_dim=31, dim=31, stage=2, num_blocks=[2, 4, 4]):
         super(MST, self).__init__()
         self.dim = dim
         self.stage = stage
@@ -259,7 +265,7 @@ class MST(nn.Module):
         # Decoder
         for i, (FeaUpSample, Fution, LeWinBlcok) in enumerate(self.decoder_layers):
             fea = FeaUpSample(fea)
-            fea = Fution(torch.cat([fea, fea_encoder[self.stage-1-i]], dim=1))
+            fea = Fution(torch.cat([fea, fea_encoder[self.stage - 1 - i]], dim=1))
             fea = LeWinBlcok(fea)
 
         # Mapping
@@ -267,14 +273,16 @@ class MST(nn.Module):
 
         return out
 
+
 class MST_Plus_Plus(nn.Module):
     def __init__(self, in_channels=20, out_channels=100, n_feat=31, stage=3):
         super(MST_Plus_Plus, self).__init__()
         self.stage = stage
-        self.conv_in = nn.Conv2d(in_channels, n_feat, kernel_size=3, padding=(3 - 1) // 2,bias=False)
-        modules_body = [MST(dim=31, stage=2, num_blocks=[1,1,1]) for _ in range(stage)]
+        self.conv_in = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=(3 - 1) // 2, bias=False)
+        modules_body = [MST(in_dim=out_channels, out_dim=out_channels, dim=n_feat, stage=2, num_blocks=[1, 1, 1]) for _ in
+                        range(stage)]
         self.body = nn.Sequential(*modules_body)
-        self.conv_out = nn.Conv2d(n_feat, out_channels, kernel_size=3, padding=(3 - 1) // 2,bias=False)
+        self.conv_out = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=(3 - 1) // 2, bias=False)
 
     def forward(self, x):
         """
@@ -289,19 +297,6 @@ class MST_Plus_Plus(nn.Module):
         x = self.conv_in(x)
         h = self.body(x)
         h = self.conv_out(h)
+        # print(x.shape, h.shape)
         h += x
         return h[:, :, :h_inp, :w_inp]
-
-
-
-
-
-
-
-
-
-
-
-
-
-

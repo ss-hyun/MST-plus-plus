@@ -19,3 +19,4 @@ class DatasetFromHdf5(data.Dataset):
 
     def __len__(self):
         return self.data.shape[0]
+
